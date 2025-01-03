@@ -22,7 +22,7 @@ E-mail: jsh10198@naver.com,   Password: password
 </p>
 
 ### Turtlebot3 Manipulating video
-[turtlebot3 manipulating video](capture/manipulating.mp4)
+[turtlebot3 manipulating video](capture/manipulating.MOV)
 
 ## How to execute
 
