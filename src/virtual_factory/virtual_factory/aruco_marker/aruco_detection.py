@@ -124,8 +124,8 @@ class ArucoDetection(Node):
         # 타겟 마커의 이동 벡터를 기준 좌표계로 변환
         tvec_relative = R_base_inv @ (target_tvec.T - base_tvec.T)
 
-        # x, z 성분만 추출
-        tvec_relative_xz = tvec_relative[[0, 2]]  # x, z 좌표 (상대 이동)
+        # z, x 성분만 추출
+        tvec_relative_xz = tvec_relative[[0, 2]]  # z, x 좌표 (상대 이동)
         distance = np.linalg.norm(tvec_relative_xz)  # 거리 계산
         if distance == 0:
             angle_rad = 0.0
@@ -133,7 +133,7 @@ class ArucoDetection(Node):
         else:
             direction_vector = tvec_relative_xz / distance  # 방향 벡터 (단위 벡터)
 
-        # x, z를 기반으로 각도 계산 (atan2 사용)
+        # z, x를 기반으로 각도 계산 (atan2 사용)
         angle_rad = np.arctan2(tvec_relative_xz[1], tvec_relative_xz[0])  # 라디안 단위
 
         # scipy를 사용하여 쿼터니언으로 변환
@@ -234,11 +234,10 @@ class ArucoDetection(Node):
                     
                     # 상대 위치 하나 처리 후 루프 종료
                     break
-            else:
-                self.get_logger().warn("기준 마커(ID 2) 또는 타겟 마커(ID 15)를 찾을 수 없음.")
-                # 처리된 이미지를 화면에 표시 (마커 미탐지)
-                cv2.imshow("ArUco Markers", cv_image)
-                cv2.waitKey(1)  # OpenCV 창을 업데이트
+                
+                else:
+                    self.get_logger().warn("기준 마커(ID 2) 또는 타겟 마커(ID 15)를 찾을 수 없음.")
+
 
     def main(args=None):
         """
