@@ -16,6 +16,11 @@ E-mail: jsh10198@naver.com,   Password: password
  <img src="capture/aruco_detecting.png" alt="Aruco Detecting" width="800">
 </p>
 
+### 기준마커를 통해 목표마커의 좌표를 계산하는 모습
+<p align="center">
+ <img src="capture/result_04_44_28.png" alt="Aruco Detecting" width="800">
+</p>
+
 ### Turtlebot3 Manipulating video
 [turtlebot3 manipulating video](capture/manipulating.mp4)
 
