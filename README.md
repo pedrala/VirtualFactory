@@ -5,3 +5,12 @@ Use the Aruko marker to calculate the relative coordinates and move Turtlebot3 t
 
 ## Capture
 
+### GUI 로 Login 창을 띄운 모습
+<p align="center">
+  <img src="capture/login.png" alt="Login" width="500"> 
+</p>
+
+### Login 후 World View 로 Aruco 마커를 감지하는 모습
+<p align="center">
+ <img src="capture/aruco_detecting.png" alt="Aruco Detecting" width="800">
+</p>
