@@ -6,14 +6,15 @@ from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
 from nav2_msgs.action import NavigateToPose
 import math
-from manipulator_msg.msg import RelativePosition  # Import the custom message
+from virtual_factory_if.msg import RelativePosition  # Import the custom message
+from virtual_factory_if.srv import GoalLocation  # Import the custom message
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from tf2_ros import TransformBroadcaster
 from tf2_geometry_msgs import PoseStamped
 from geometry_msgs.msg import Quaternion
 #from tf2_geometry_msgs.tf2_geometry_msgs import toMsg
 from scipy.spatial.transform import Rotation as R
-from manipulator_msg.srv import GoalLocation  # Import the custom message
+
 #import tf_transformations as tft  # 기존 라이브러리를추가!
 
 class AMRNode(Node):

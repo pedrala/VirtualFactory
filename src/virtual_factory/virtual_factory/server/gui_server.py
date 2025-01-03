@@ -20,25 +20,9 @@ from rclpy.executors import MultiThreadedExecutor
 import cv2
 import numpy as np
 import json
-
-
-# ArUco 마커 딕셔너리와 파라미터 설정
-aruco_dict_type = cv2.aruco.DICT_5X5_100
-aruco_dict = cv2.aruco.getPredefinedDictionary(aruco_dict_type)
-aruco_params = cv2.aruco.DetectorParameters()
-
-# 카메라 파라미터 로드
-camera_matrix = np.load('/home/viator/ws/aruco/aruco_grasp_conveyor/src/aruco_grasp_conveyor/aruco_grasp_conveyor/aruco_marker/npy/camera_matrix.npy')
-dist_coeffs = np.load('/home/viator/ws/aruco/aruco_grasp_conveyor/src/aruco_grasp_conveyor/aruco_grasp_conveyor/aruco_marker/npy/distortion_coefficients.npy')
-                     
-# 마커 크기
-marker_length = 0.1  # 단위: 미터
-
-# 기준 마커 ID 설정
-base_marker_id = 15
-comparison_marker_id = 2
-
-
+from virtual_factory_if.msg import RelativePosition 
+from virtual_factory_if.srv import GoalLocation  
+from std_msgs.msg import Int32, Float32, String 
 
 class LoginWindow(QWidget):
     def __init__(self, stacked_widget):
@@ -51,7 +35,7 @@ class LoginWindow(QWidget):
         layout.setContentsMargins(100, 50, 100, 50)  # Add margins for spacing
         layout.setSpacing(50)  # Add spacing between widgets
 
-        # Title
+        # Titleprocess_frame
         self.title = QLabel("Robot Control System\n\n\nLogin")
         self.title.setFixedHeight(300)
         self.title.setAlignment(Qt.AlignCenter)
@@ -120,15 +104,20 @@ class LoginWindow(QWidget):
         else:
             self.error_label.setText("Invalid E-mail or Password")  # 에러 메시지를 업데이트
 
-
-
 class MainApplication(QStackedWidget):
     def __init__(self):
         super().__init__()
+        
+        # QoS 프로파일 생성
+        qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,  
+            depth=10
+        )
+
         self.setWindowTitle("Robot Control System")
         self.setGeometry(100, 100, 1600, 1000)
         self.node = Node("gui_node")  # ROS2 노드 생성
-        self.bridge = CvBridge()  # CvBridge 초기화
+        self.bridge = CvBridge()  # CvBridge 초gui_server2기화
         self.publisher_conveyor = self.node.create_publisher(String, "conveyor_test", 10)
         self.publisher_learning = self.node.create_publisher(String, "learning_test", 10)
         self.publisher_confirm = self.node.create_publisher(String, 'target_counts', 10)
@@ -143,36 +132,47 @@ class MainApplication(QStackedWidget):
         self.coord_ry = ""
         self.coord_rz = ""
         
+        # status 토픽 Subscribe
+        self.subscription_status = self.node.create_subscription(
+            String, 'status_topic', self.status_callback, 10
+        )        
+        
+        # coordinate 토픽 Subscribe
+        self.subscription_coordinate = self.node.create_subscription(
+            RelativePosition, 
+            'marker_relative_position', 
+            self.coordinate_callback, 
+            qos_profile=qos_profile
+        )               
+        
         # webcam_image 토픽 Subscribe
         self.subscription_world = self.node.create_subscription(
-            Image, 'aruco_detection_image', self.world_eye_image_callback, 10
-        )
-        
+            Image, 
+            'aruco_detected_image',
+            self.world_eye_image_callback, 
+            qos_profile=qos_profile 
+        )                       
+      
         # hand_image 토픽 Subscribe
         self.subscription_hand = self.node.create_subscription(
-            Image, 'hand_image', self.hand_eye_image_callback, 10
+            Image, 
+            'hand_image', 
+            self.hand_eye_image_callback, 
+            qos_profile=qos_profile 
+        )
+        
+        # 목표 위치를 요청할 수 있는 클라이언트 생성
+        self.goal_position = self.node.create_client(
+            GoalLocation,
+            '/goal_position',
+            qos_profile=qos_profile
         )
         
         # gripper_image 토픽 Subscribe
         # self.subscription_hand = self.node.create_subscription(
         #     Image, 'gripper_image', self.hand_eye_image_callback, 10
         # )
-        
-        # status 토픽 Subscribe
-        self.subscription_status = self.node.create_subscription(
-            String, 'status_topic', self.status_callback, 10
-        )
-        
-        qos_profile = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
-            depth=10
-        )
-        
-        # coordinate 토픽 Subscribe
-        self.subscription_coordinate = self.node.create_subscription(
-            String, 'marker_relative_position', self.coordinate_callback, qos_profile=qos_profile
-        )
-        
+                
         self.world_timer = QTimer()
         self.world_timer.timeout.connect(self.spin_ros_world)  # ROS 이벤트 처리
         self.world_timer.start(10)  # 10ms 간격으로 spin 호출
@@ -502,14 +502,35 @@ class MainApplication(QStackedWidget):
         self.status = msg
         self.robot_status_label.setText(f"Status: {self.status}")
         
-    def update_coordinate(self, msg):
-        self.coordinate = msg
-        self.coord_x = self.coordinate[0:3]
-        self.coord_y = self.coordinate[3:6]
-        self.coord_z = self.coordinate[6:9]
-        self.coord_rx = self.coordinate[9:12]
-        self.coord_ry = self.coordinate[12:15]
-        self.coord_rz = self.coordinate[15:18]
+    def update_coordinate(self, msg):       
+        
+        # 정수 거리 값을 계산하여 3자리로 표시
+        x_int = int(abs(msg.x * 1000))
+        y_int = int(abs(msg.y * 1000))
+        z_int = int(abs(msg.z * 1000))
+
+        # 3자리 숫자로 포맷팅
+        x_formatted = f"{x_int:03}"
+        y_formatted = f"{y_int:03}"
+        z_formatted = f"{z_int:03}"
+        
+        roll, pitch, yaw = msg.rx, msg.ry, msg.rz
+
+        # 각도를 계산하고 3자리로 포맷팅 (rx, ry, rz)
+        rx_angle = int(abs(np.degrees(roll)))  # 라디안 → 도
+        ry_angle = int(abs(np.degrees(pitch)))
+        rz_angle = int(abs(np.degrees(yaw)))
+
+        rx_formatted = f"{rx_angle:03}"
+        ry_formatted = f"{ry_angle:03}"
+        rz_formatted = f"{rz_angle:03}"
+
+        self.coord_x = x_formatted
+        self.coord_y = y_formatted
+        self.coord_z = z_formatted
+        self.coord_rx = rx_formatted
+        self.coord_ry = ry_formatted
+        self.coord_rz = rz_formatted
         self.robot_coordinate_label.setText(f"X( {self.coord_x}mm )   Y( {self.coord_y}mm )   Z( {self.coord_z}mm )\nRX( {self.coord_rx}deg )   RY( {self.coord_ry}deg )   RZ( {self.coord_rz}deg )")
         
     def world_eye_image_callback(self, msg):
@@ -551,7 +572,32 @@ class MainApplication(QStackedWidget):
         
     def coordinate_callback(self, msg):
         self.coordinate = msg.data
+        
+        # GoalLocation 서비스 요청 객체 생성
+        request = GoalLocation.Request()
+        request.marker_id = msg.marker_id  # marker_id 추가
+        request.x = msg.x
+        #request.y = msg.y y값 필요없으므로 생략
+        request.z = msg.z
+        # Float32 메시지 객체 생성 후 거리 값 할당
+        request.distance = Float32()
+        request.distance.data = float(msg.distance)  # 거리 값은 float 타입으로 할당
+        request.quaternion = msg.quaternion  # 회전 정보 추가
+
+        # ROS2 서비스 호출
+        future = self.goal_position.call_async(request)
+        future.add_done_callback(self.callback)
+        
+        #GUI에 좌표, 벡터값 표시
         self.update_coordinate(self.coordinate)
+        
+    def callback(self, future):
+        # 서비스 호출 후 응답 처리
+        try:
+            response = future.result()
+            self.get_logger().info(f'Success: {response.success}, Message: {response.message}')
+        except Exception as e:
+            self.get_logger().error(f'Service call failed: {e}')
         
     def spin_ros_world(self):
         """ROS2 이벤트 주기적으로 처리"""
@@ -566,8 +612,6 @@ class MainApplication(QStackedWidget):
         self.node.destroy_node()
         rclpy.shutdown()
         super().closeEvent(event)
-
-
 
 # class ConveyorController(Node):
 #     def __init__(self):
@@ -622,156 +666,6 @@ class MainApplication(QStackedWidget):
 #             self.get_logger().warn(f"Invalid command: {self.command}")
 
 
-
-class ArucoDetection(Node):
-    def __init__(self):
-        super().__init__('aruco_detection')
-
-        # ROS 퍼블리셔 설정
-        self.marker_publisher = self.create_publisher(
-            String, 
-            'marker_relative_position', 
-            10
-        )
-        
-        self.image_publisher = self.create_publisher(
-            Image, 
-            'aruco_detection_image', 
-            10
-        )
-        
-        self.bridge = CvBridge()  # CvBridge 초기화
-        
-        # 카메라 입력 설정
-        self.cap = cv2.VideoCapture("/dev/video0")  # PC 카메라로부터 영상 가져오기
-        if not self.cap.isOpened():
-            self.get_logger().error("Unable to open camera!")
-            raise RuntimeError("Webcam could not be opened.")
-
-        # ROS 타이머 설정 (30Hz)
-        self.timer = self.create_timer(0.1, self.process_frame)
-        self.get_logger().info("ArucoDetection Node Initialized. Publishing to 'marker_relative_position'")
-
-    def process_frame(self):
-        """
-        카메라 프레임을 읽고 ArUco 마커를 탐지하여 퍼블리시
-        """
-        ret, frame = self.cap.read()  # 프레임 읽기
-        if not ret:
-            self.get_logger().error("Failed to read frame from camera")
-            return
-        
-        # OpenCV 이미지를 ROS 메시지로 변환
-        # image_message = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
-        
-        # 이미지 퍼블리시
-        # self.image_publisher.publish(image_message)
-
-        # ArUco 마커 탐지
-        corners, ids, _ = cv2.aruco.detectMarkers(frame, aruco_dict, parameters=aruco_params)
-
-        if ids is not None:
-            # ArUco 마커 탐지 로그 출력
-            # self.get_logger().info(f"Detected markers: {ids.flatten().tolist()}")
-
-            # 마커의 포즈 추정
-            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, marker_length, camera_matrix, dist_coeffs)
-
-            # 기준 마커 찾기
-            base_rvec, base_tvec = None, None
-            for i, marker_id in enumerate(ids):
-                if marker_id[0] == base_marker_id:
-                    base_rvec = rvecs[i]
-                    base_tvec = tvecs[i]
-                    break
-
-            if base_rvec is not None and base_tvec is not None:
-                # ID 14번 마커에 대해 상대 위치 계산
-                cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, base_rvec, base_tvec, 0.05)
-                
-                for i, marker_id in enumerate(ids):
-                    if marker_id[0] == comparison_marker_id:
-                        # 현재 마커의 회전 및 이동 벡터
-                        marker_rvec = rvecs[i]
-                        marker_tvec = tvecs[i]
-
-                        # 기준 마커에 대한 상대 위치 계산
-                        relative_rvec, relative_tvec = self.calculate_relative_position(base_rvec, base_tvec, marker_rvec, marker_tvec)
-                        x, y, z = relative_tvec.flatten()
-                        rx, ry, rz = relative_rvec.flatten()
-                        
-                        # 정수 거리 값을 계산하여 3자리로 표시
-                        x_int = int(abs(x * 1000))
-                        y_int = int(abs(y * 1000))
-                        z_int = int(abs(z * 1000))
-
-                        # 3자리 숫자로 포맷팅
-                        x_formatted = f"{x_int:03}"
-                        y_formatted = f"{y_int:03}"
-                        z_formatted = f"{z_int:03}"
-                        
-                        # 각도를 계산하고 3자리로 포맷팅 (rx, ry, rz)
-                        rx_angle = int(abs(np.degrees(rx)))  # 라디안 → 도
-                        ry_angle = int(abs(np.degrees(ry)))
-                        rz_angle = int(abs(np.degrees(rz)))
-
-                        rx_formatted = f"{rx_angle:03}"
-                        ry_formatted = f"{ry_angle:03}"
-                        rz_formatted = f"{rz_angle:03}"
-
-                        # 18자리 포맷팅 (x, y, z, rx, ry, rz)
-                        formatted_output = f"{x_formatted}{y_formatted}{z_formatted}{rx_formatted}{ry_formatted}{rz_formatted}"
-
-                        # 퍼블리시할 메시지 생성
-                        # message = (f"Marker ID: {marker_id[0]}, "
-                        #            f"Position: x={x:.3f}, y={y:.3f}, z={z:.3f}, "
-                        #            f"Rotation: rx={rx:.3f}, ry={ry:.3f}, rz={rz:.3f}")
-                        message = formatted_output
-                        self.marker_publisher.publish(String(data=message))
-                        # self.get_logger().info("[PUBLISHED] " + message)
-
-                        # 마커와 축 표시
-                        cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, marker_rvec, marker_tvec, 0.05)
-
-            # 탐지된 마커 그리기
-            cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-        else:
-            self.get_logger().info("No markers detected in this frame.")
-
-        # 결과 영상 출력
-        # cv2.imshow("Aruco Detection", frame)
-        # if cv2.waitKey(1) & 0xFF == ord('q'):
-        #     self.destroy_node()
-        #     rclpy.shutdown()
-        #     self.cap.release()
-        #     cv2.destroyAllWindows()
-        
-        # OpenCV 이미지를 ROS 메시지로 변환
-        image_message = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
-        
-        # 이미지 퍼블리시
-        self.image_publisher.publish(image_message)
-
-    def calculate_relative_position(self, base_rvec, base_tvec, marker_rvec, marker_tvec):
-        """
-        기준 마커와 다른 마커 간 상대 위치를 계산
-        """
-        base_rmat, _ = cv2.Rodrigues(base_rvec)
-        marker_rmat, _ = cv2.Rodrigues(marker_rvec)
-
-        relative_rmat = np.dot(np.linalg.inv(base_rmat), marker_rmat)
-        relative_rvec, _ = cv2.Rodrigues(relative_rmat)
-        relative_tvec = marker_tvec - base_tvec
-
-        return relative_rvec, relative_tvec
-    
-    def destroy_node(self):
-        """노드 종료 시 리소스 정리"""
-        self.cap.release()  # 웹캠 리소스 해제
-        super().destroy_node()
-
-
-
 def main():
     """
     ROS2 Conveyor Node와 PyQt5 GUI를 멀티스레드로 실행하는 통합 main 함수.
@@ -784,12 +678,10 @@ def main():
 
     # Conveyor Controller 노드 생성
     #conveyor_controller_node = ConveyorController()
-    aruco_marker_node = ArucoDetection()
 
     # MultiThreadedExecutor 생성 및 노드 추가
     executor = MultiThreadedExecutor()
     #executor.add_node(conveyor_controller_node)
-    executor.add_node(aruco_marker_node)
     
     # PyQt5 GUI 생성
     gui_node = MainApplication()
@@ -819,9 +711,7 @@ def main():
     finally:
         # 종료 처리
         #conveyor_controller_node.destroy_node()
-        aruco_marker_node.destroy_node()
         rclpy.shutdown()
-
 
 
 if __name__ == "__main__":
