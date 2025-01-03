@@ -134,16 +134,13 @@ class MainApplication(QStackedWidget):
         self.coord_rx = ""
         self.coord_ry = ""
         self.coord_rz = ""
-        
+        # Conveyor 버튼 스타트/스탑 클릭시 퍼블리쉬 
         self.publisher_conveyor = self.node.create_publisher(String, "conveyor_test",  qos_profile=qos_profile)
         # Learniing 버튼 스타트/스탑 클릭시 퍼블리쉬  
         self.publisher_learning = self.node.create_publisher(String, "learning_test",  qos_profile=qos_profile)
-        # 잡조건(빨강박스, 파랑박스) 퍼블리쉬  
-        self.publisher_confirm = self.node.create_publisher(String, 'target_counts',  qos_profile=qos_profile)               
-        # 상태 퍼블리셔 생성
-        self.state_publisher = self.create_publisher(String, 'status_topic', qos_profile=qos_profile)
-        
-        
+        # 타겟카운트 잡조건(빨강박스, 파랑박스) 퍼블리쉬  
+        self.publisher_confirm = self.node.create_publisher(String, 'target_counts',  qos_profile=qos_profile)              
+       
         
         # status 토픽 Subscribe
         self.subscription_status = self.node.create_subscription(

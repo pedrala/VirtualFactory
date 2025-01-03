@@ -53,7 +53,12 @@ class RobotManipulationServer(Node):
             depth=10
         )
         
-        self.command_sub = self.create_subscription(String, "/learning_test", self.command_callback, qos_profile=qos_profile )
+        self.command_sub = self.create_subscription(
+            String, 
+            "/learning_test", 
+            self.command_callback, 
+            qos_profile=qos_profile 
+        )
         
         self.subscription = self.create_subscription(
             String,
@@ -80,12 +85,12 @@ class RobotManipulationServer(Node):
         # OpenCV 이미지를 ROS 2 Image 메시지로 변환하기 위한 CvBridge 생성
         self.bridge = CvBridge()
         
-        # 타겟 카운트를 구독하는 서브스크라이버 생성
+        # 잡목록에서 사용자가 잡을 선택했을 시 구독받음
         self.target_counts_sub = self.create_subscription(
-            String,  # 메시지 타입
-            '/target_counts',  # 토픽 이름
-            self.target_counts_callback,  # 콜백 함수
-            qos_profile  # QoS 깊이
+            String,  
+            '/target_counts', 
+            self.target_counts_callback, 
+            qos_profile
         )
         self.target_counts = {"RED": 0, "BLUE": 0}  # 기본 타겟 카운트 설정
 
