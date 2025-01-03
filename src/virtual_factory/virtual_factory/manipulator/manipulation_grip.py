@@ -5,12 +5,14 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from control_msgs.action import GripperCommand
 from std_msgs.msg import Header, String
 from ultralytics import YOLO
+import os
 import cv2
 import math
 import time
 import json
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+from rclpy.qos import QoSProfile, ReliabilityPolicy
 
 # 상수 정의
 r1 = 130
@@ -44,17 +46,37 @@ def solv_robot_arm2(x, y, z_fixed, r1, r2, r3):
 class RobotManipulationServer(Node):
     def __init__(self):
         super().__init__('robot_manipulation_server')
+        
+        # QoS 프로파일 생성
+        qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,  
+            depth=10
+        )
+        
+        self.command_sub = self.create_subscription(String, "/learning_test", self.command_callback, qos_profile=qos_profile )
+        
+        self.subscription = self.create_subscription(
+            String,
+            'status_topic',
+            self.status_callback,
+            qos_profile=qos_profile
+        )
+                
         # 로봇 팔의 조인트 트래젝토리를 퍼블리시하는 퍼블리셔 생성
-        self.joint_pub = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 10)
+        self.joint_pub = self.create_publisher(
+            JointTrajectory, 
+            '/arm_controller/joint_trajectory', 
+            qos_profile=qos_profile 
+        )
+        
         # 그리퍼 액션 클라이언트 생성
-        self.gripper_action_client = ActionClient(self, GripperCommand, 'gripper_controller/gripper_cmd')
-
-        # 카메라 에러를 퍼블리시하는 퍼블리셔 생성
-        self.camera_error_pub = self.create_publisher(String, '/hand_eye_error', 10)
+        self.gripper_action_client = ActionClient(self, GripperCommand, 'gripper_controller/gripper_cmd')       
 
         # 그리퍼 이미지를 퍼블리시하는 퍼블리셔 생성
-        self.image_pub = self.create_publisher(Image, '/gripper_image', 10)
-
+        self.hand_image_pub = self.create_publisher(Image, '/hand_image',  qos_profile=qos_profile )  
+        
+        self.is_learning = False            
+        
         # OpenCV 이미지를 ROS 2 Image 메시지로 변환하기 위한 CvBridge 생성
         self.bridge = CvBridge()
         
@@ -63,7 +85,7 @@ class RobotManipulationServer(Node):
             String,  # 메시지 타입
             '/target_counts',  # 토픽 이름
             self.target_counts_callback,  # 콜백 함수
-            10  # QoS 깊이
+            qos_profile  # QoS 깊이
         )
         self.target_counts = {"RED": 0, "BLUE": 0}  # 기본 타겟 카운트 설정
 
@@ -74,12 +96,66 @@ class RobotManipulationServer(Node):
         self.trajectory_msg.joint_names = ['joint1', 'joint2', 'joint3', 'joint4']
 
         # YOLO 모델 로드 (YOLOv8 모델 경로를 본인의 환경에 맞게 변경하세요)
-        self.yolo_model = YOLO("/home/booding/box.pt")
+        self.yolo_model = YOLO("/home/viator/ws/aruco/virtual_factory/src/virtual_factory/virtual_factory/manipulator/box.pt")
         self.get_logger().info("로봇 매니퓰레이션 서버가 준비되었습니다.")
 
         # 초기 위치로 이동
         self.move_to_initial_position()
+        
+    def command_callback(self, msg):
+        """Handle received commands."""
+        self.get_logger().warning(f"Received message: {msg.data}")
+        if msg.data == "Learning Start":
+            self.is_learning = True
+        elif msg.data == "Learning Stop":
+            self.is_learning = False           
     
+    
+    def status_callback(self, msg):
+        """상태 메시지를 처리하는 콜백 함수."""
+        status = msg.data
+        self.get_logger().info(f'Received status: {status}')
+    
+        # 상태에 따라 동작 수행
+        if status in ('box_initial_pose', 'put_box', 'put_initial_goal'):
+            self.capture_requested = True
+            self.timer = self.create_timer(0.1, self.capture_and_publish)
+        elif status in ('pick_box', 'picking_basket', 'error'):
+            self.capture_requested = False
+            self.timer = self.create_timer(0.1, self.capture_and_publish)
+        else:
+            self.get_logger().info(f'Unhandled status received: {status}')
+    
+    def capture_and_publish(self):
+        """캡처 신호를 수신했을 때 이미지를 캡처하고 퍼블리시"""
+        if self.capture_requested:
+            ret, frame = self.cap.read()
+            if not ret:
+                self.get_logger().warn("Failed to capture image from webcam.")
+                return            
+
+            try:
+                # OpenCV 이미지를 ROS 메시지로 변환
+                image_message = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
+                
+                # 핸드 이미지 퍼블리시
+                self.hand_image_pub.publish(image_message)
+                
+                if self.is_learning:
+                    self.save_image(frame)
+                
+            except Exception as e:
+                self.get_logger().error(f"Failed to process image: {e}")
+
+    def save_image(self, frame):
+        """현재 프레임을 파일로 저장."""
+        os.makedirs("learning_data", exist_ok=True)
+        timestamp = int(time.time())
+        file_name = f"learning_data/captured_{timestamp}.jpg"
+        cv2.imwrite(file_name, frame)
+        self.get_logger().info(f"Saved image: {file_name}")
+
+
     def target_counts_callback(self, msg):
         """
         서브스크라이브한 토픽으로부터 타겟 카운트를 업데이트하는 콜백 함수.
@@ -113,7 +189,6 @@ class RobotManipulationServer(Node):
             # 카메라 에러 퍼블리시
             error_msg = String()
             error_msg.data = error_message
-            self.camera_error_pub.publish(error_msg)
             return
 
         ret, frame = cap.read()
@@ -124,7 +199,6 @@ class RobotManipulationServer(Node):
             # 카메라 에러 퍼블리시
             error_msg = String()
             error_msg.data = error_message
-            self.camera_error_pub.publish(error_msg)
             cap.release()
             return
 
@@ -369,9 +443,8 @@ class RobotManipulationServer(Node):
         image_msg = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
 
         # 이미지 퍼블리시
-        self.image_pub.publish(image_msg)
+        self.hand_image_pub.publish(image_msg)
         self.get_logger().info("/gripper_image 토픽으로 이미지를 퍼블리시했습니다.") 
-
 
 def main(args=None):
     rclpy.init(args=args)

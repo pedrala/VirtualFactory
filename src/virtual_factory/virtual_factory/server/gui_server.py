@@ -24,6 +24,12 @@ from virtual_factory_if.msg import RelativePosition
 from virtual_factory_if.srv import GoalLocation  
 from std_msgs.msg import Int32, Float32, String 
 
+
+# 아두이노 실행 안될 때
+# \dev\video*
+# sudo chmod a+rw /dev/ttyACM0
+
+
 class LoginWindow(QWidget):
     def __init__(self, stacked_widget):
         super().__init__()
@@ -117,10 +123,7 @@ class MainApplication(QStackedWidget):
         self.setWindowTitle("Robot Control System")
         self.setGeometry(100, 100, 1600, 1000)
         self.node = Node("gui_node")  # ROS2 노드 생성
-        self.bridge = CvBridge()  # CvBridge 초gui_server2기화
-        self.publisher_conveyor = self.node.create_publisher(String, "conveyor_test", 10)
-        self.publisher_learning = self.node.create_publisher(String, "learning_test", 10)
-        self.publisher_confirm = self.node.create_publisher(String, 'target_counts', 10)
+        self.bridge = CvBridge()  # CvBridge 초gui_server2기화       
         self.timer = QTimer()
         self.elapsed_time = QTime(0, 0, 0)
         self.timer.timeout.connect(self.update_task_time)
@@ -132,9 +135,22 @@ class MainApplication(QStackedWidget):
         self.coord_ry = ""
         self.coord_rz = ""
         
+        self.publisher_conveyor = self.node.create_publisher(String, "conveyor_test",  qos_profile=qos_profile)
+        # Learniing 버튼 스타트/스탑 클릭시 퍼블리쉬  
+        self.publisher_learning = self.node.create_publisher(String, "learning_test",  qos_profile=qos_profile)
+        # 잡조건(빨강박스, 파랑박스) 퍼블리쉬  
+        self.publisher_confirm = self.node.create_publisher(String, 'target_counts',  qos_profile=qos_profile)               
+        # 상태 퍼블리셔 생성
+        self.state_publisher = self.create_publisher(String, 'status_topic', qos_profile=qos_profile)
+        
+        
+        
         # status 토픽 Subscribe
         self.subscription_status = self.node.create_subscription(
-            String, 'status_topic', self.status_callback, 10
+            String, 
+            'status_topic', 
+            self.status_callback, 
+            qos_profile=qos_profile
         )        
         
         # coordinate 토픽 Subscribe
@@ -166,12 +182,7 @@ class MainApplication(QStackedWidget):
             GoalLocation,
             '/goal_position',
             qos_profile=qos_profile
-        )
-        
-        # gripper_image 토픽 Subscribe
-        # self.subscription_hand = self.node.create_subscription(
-        #     Image, 'gripper_image', self.hand_eye_image_callback, 10
-        # )
+        )        
                 
         self.world_timer = QTimer()
         self.world_timer.timeout.connect(self.spin_ros_world)  # ROS 이벤트 처리
@@ -567,8 +578,40 @@ class MainApplication(QStackedWidget):
             self.node.get_logger().error(f"Failed to process image: {e}")
             
     def status_callback(self, msg):
+        """수신된 메시지를 확인하여 'error' 상태일 경우 이메일을 보냄."""
         self.status = msg.data
+        self.get_logger().info(f"Received status: {self.status}")
         self.update_status(self.status)
+        
+        if self.status == 'error':
+            self.send_email("Error detected", "An error has been detected in the system!")
+
+    def send_email(self, subject, body):
+        """이메일 발송 함수"""
+        try:
+            sender_email = "rokey01338@gmail.com"  # Gmail 이메일 주소
+            receiver_email = "jsh10198@naver.com"  # 받는 사람 이메일
+            password = "dyzh vhkl vboj nzoz"  # Gmail 앱 비밀번호
+
+            # 이메일 메시지 구성
+            msg = MIMEMultipart()
+            msg['From'] = sender_email
+            msg['To'] = receiver_email
+            msg['Subject'] = subject
+
+            msg.attach(MIMEText(body, 'plain'))
+
+            # SSL/TLS 연결 및 이메일 발송
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as server:
+                server.login(sender_email, password)  # Gmail 이메일과 비밀번호로 로그인
+                server.sendmail(sender_email, receiver_email, msg.as_string())
+                
+            self.get_logger().info("Email sent successfully.")
+        except Exception as e:
+            self.get_logger().error(f"Failed to send email: {e}")
+
+
         
     def coordinate_callback(self, msg):
         self.coordinate = msg.data
@@ -613,57 +656,57 @@ class MainApplication(QStackedWidget):
         rclpy.shutdown()
         super().closeEvent(event)
 
-# class ConveyorController(Node):
-#     def __init__(self):
-#         super().__init__('conveyor_controller')
-#         self.subscription = self.create_subscription(
-#             String,
-#             'conveyor_test',
-#             self.listener_callback,
-#             10
-#         )
-#         self.serial_port = serial.Serial('/dev/ttyACM0', 115200, timeout=1)  # 시리얼 포트 설정
-#         self.get_logger().info(f"Serial port opened: {self.serial_port.name}")  # Should print the serial port name
-#         self.get_logger().info('Conveyor Controller Node Started')
+class ConveyorController(Node):
+    def __init__(self):
+        super().__init__('conveyor_controller')
+        self.subscription = self.create_subscription(
+            String,
+            'conveyor_test',
+            self.listener_callback,
+            10
+        )
+        #self.serial_port = serial.Serial('/dev/ttyACM0', 115200, timeout=1)  # 시리얼 포트 설정
+        #self.get_logger().info(f"Serial port opened: {self.serial_port.name}")  # Should print the serial port name
+        self.get_logger().info('Conveyor Controller Node Started')
         
-#         # 초기 명령 상태를 "Conveyor Stop"으로 설정
-#         self.command = "Conveyor Stop"
+        # 초기 명령 상태를 "Conveyor Stop"으로 설정
+        self.command = "Conveyor Stop"
 
-#         # 0.5초마다 호출되는 타이머 설정
-#         self.con_timer = self.create_timer(1.0, self.timer_callback)
+        # 0.5초마다 호출되는 타이머 설정
+        self.con_timer = self.create_timer(1.0, self.timer_callback)
 
-#     def listener_callback(self, msg):
-#         command = msg.data.strip()  # 토픽에서 문자열 데이터 가져오기 및 공백 제거
-#         self.get_logger().info(f"Received command: {command}")
+    def listener_callback(self, msg):
+        command = msg.data.strip()  # 토픽에서 문자열 데이터 가져오기 및 공백 제거
+        self.get_logger().info(f"Received command: {command}")
         
-#         # 명령이 "Conveyor Start" 또는 "Conveyor Stop"일 때 상태 변경
-#         if command == "Conveyor Start":
-#             self.command = "Conveyor Start"
-#             self.send_serial_command(755)  # Send "START" to Arduino
-#         elif command == "Conveyor Stop":
-#             self.command = "Conveyor Stop"
-#             self.send_serial_command(0)  # Send "STOP" to Arduino
-#         else:
-#             self.get_logger().warn(f"Unknown command received: {command}")
+        # 명령이 "Conveyor Start" 또는 "Conveyor Stop"일 때 상태 변경
+        if command == "Conveyor Start":
+            self.command = "Conveyor Start"
+            self.send_serial_command(755)  # Send "START" to Arduino
+        elif command == "Conveyor Stop":
+            self.command = "Conveyor Stop"
+            self.send_serial_command(0)  # Send "STOP" to Arduino
+        else:
+            self.get_logger().warn(f"Unknown command received: {command}")
 
-#     def send_serial_command(self, command):
-#         try:
-#             command_str = f"{command}\n"  # 명령 뒤에 종료 문자 추가
-#             self.serial_port.write(command_str.encode())
-#             self.get_logger().info(f"Sent command to Arduino: {command_str.strip()}")
-#         except Exception as e:
-#             self.get_logger().error(f"Failed to send command: {str(e)}")
+    def send_serial_command(self, command):
+        try:
+            command_str = f"{command}\n"  # 명령 뒤에 종료 문자 추가
+            self.serial_port.write(command_str.encode())
+            self.get_logger().info(f"Sent command to Arduino: {command_str.strip()}")
+        except Exception as e:
+            self.get_logger().error(f"Failed to send command: {str(e)}")
             
-#     def timer_callback(self):
-#         # 1.0초마다 실행되는 콜백
-#         self.get_logger().info(f"Current command: {self.command}")
+    def timer_callback(self):
+        # 1.0초마다 실행되는 콜백
+        self.get_logger().info(f"Current command: {self.command}")
         
-#         if self.command == "Conveyor Start":
-#             self.send_serial_command(755)  # "START" 명령을 아두이노에 전송
-#         elif self.command == "Conveyor Stop":
-#             self.send_serial_command(0)  # "STOP" 명령을 아두이노에 전송
-#         else:
-#             self.get_logger().warn(f"Invalid command: {self.command}")
+        if self.command == "Conveyor Start":
+            self.send_serial_command(755)  # "START" 명령을 아두이노에 전송
+        elif self.command == "Conveyor Stop":
+            self.send_serial_command(0)  # "STOP" 명령을 아두이노에 전송
+        else:
+            self.get_logger().warn(f"Invalid command: {self.command}")
 
 
 def main():

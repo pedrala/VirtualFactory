@@ -8,6 +8,9 @@ Use the Aruko marker to calculate the relative coordinates and move Turtlebot3 t
   <img src="capture/login.png" alt="Login" width="500"> 
 </p>
 
+#### Login 입력정보
+E-mail: jsh10198@naver.com,   Password: password
+
 ### Login 후 World View 로 Aruco 마커를 감지하는 모습
 <p align="center">
  <img src="capture/aruco_detecting.png" alt="Aruco Detecting" width="800">
@@ -22,12 +25,11 @@ GUI 서버 실행시키기
 ```console
 ros2 run virtual_factory gui
 ```
-Login 창에 다음을 입력
-E-mail: jsh10198@naver.com,   Password: password
 
 Aruco 마커 탐지 노드 실행시키기
 ```console
 ros2 run virtual_factory aruco
+```
 
 AMR 실행시키기
 ```console
