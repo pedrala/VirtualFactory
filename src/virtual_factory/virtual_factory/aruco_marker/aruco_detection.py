@@ -189,6 +189,7 @@ class ArucoDetection(Node):
 
                 # 기준과 타겟 마커가 모두 발견되면 상대 위치 계산
                 if base_rvec is not None and base_tvec is not None and target_rvec is not None and target_tvec is not None:
+                    
                     relative_tvec, distance, angle_rad, quaternion, rx, ry, rz = self.calculate_relative_position(
                         base_rvec, base_tvec, target_rvec, target_tvec
                     )           
@@ -253,8 +254,8 @@ class ArucoDetection(Node):
                     # 상대 위치 하나 처리 후 루프 종료
                     break
                 
-               else:
-                self.get_logger().warn(f"기준 마커(ID {base_marker_id}) 또는 타겟 마커(ID {self.target_marker_id})를 찾을 수 없음.")
+                else:
+                    self.get_logger().warn(f"기준 마커(ID {base_marker_id}) 또는 타겟 마커(ID {self.target_marker_id})를 찾을 수 없음.")
 
         else:
             self.get_logger().info("아루코 마커를 찾을 수 없습니다.")

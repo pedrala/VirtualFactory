@@ -150,7 +150,7 @@ class MainApplication(QStackedWidget):
         )        
 
         # 타겟 마커 ID를 퍼블리시하는 퍼블리셔 생성
-        self.target_marker_pub = self.create_publisher(
+        self.target_marker_pub = self.node.create_publisher(
             Int32,
             'target_marker_id',
             qos_profile=qos_profile
