@@ -1,5 +1,5 @@
 ## Overview
-Use the Aruko marker to calculate the relative coordinates and move Turtlebot3 to the corresponding location. Recognize a small box as an object with yolo8, pick it up with the manipulator, and place it on the conveyor belt. Pick up the box again at the end of the conveyor belt and move it to the unloading area. 
+Use the ArUco marker to calculate the relative coordinates and move Turtlebot3 to the corresponding location. Recognize a small box as an object with yolo8, pick it up with the manipulator, and place it on the conveyor belt. Pick up the box again at the end of the conveyor belt and move it to the unloading area. 
 
 ## Capture
 
@@ -11,7 +11,7 @@ Use the Aruko marker to calculate the relative coordinates and move Turtlebot3 t
 #### Login 입력정보
 E-mail: jsh10198@naver.com,   Password: password
 
-### Login 후 World View 로 Aruco 마커를 감지하는 모습
+### Login 후 World Eye 로 ArUco 마커를 감지하는 모습
 <p align="center">
  <img src="capture/aruco_detecting.png" alt="ArUco Detecting" width="800">
 </p>
