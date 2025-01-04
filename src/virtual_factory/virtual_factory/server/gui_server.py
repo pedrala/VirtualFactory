@@ -139,8 +139,7 @@ class MainApplication(QStackedWidget):
         # Learniing 버튼 스타트/스탑 클릭시 퍼블리쉬  
         self.publisher_learning = self.node.create_publisher(String, "learning_test",  qos_profile=qos_profile)
         # 타겟카운트 잡조건(빨강박스, 파랑박스) 퍼블리쉬  
-        self.publisher_confirm = self.node.create_publisher(String, 'target_counts',  qos_profile=qos_profile)              
-       
+        self.publisher_confirm = self.node.create_publisher(String, 'target_counts',  qos_profile=qos_profile)           
         
         # status 토픽 Subscribe
         self.subscription_status = self.node.create_subscription(
@@ -149,6 +148,13 @@ class MainApplication(QStackedWidget):
             self.status_callback, 
             qos_profile=qos_profile
         )        
+
+        # 타겟 마커 ID를 퍼블리시하는 퍼블리셔 생성
+        self.target_marker_pub = self.create_publisher(
+            Int32,
+            'target_marker_id',
+            qos_profile=qos_profile
+        )
         
         # coordinate 토픽 Subscribe
         self.subscription_coordinate = self.node.create_subscription(
@@ -228,6 +234,30 @@ class MainApplication(QStackedWidget):
 
         # Bottom Section
         bottom_layout = QHBoxLayout()
+        
+        # 마커 번호 드롭박스와 GO 버튼을 추가할 레이아웃 생성
+        marker_control_layout = QVBoxLayout()
+        marker_control_group = QGroupBox("Marker Control")
+        marker_control_group.setFixedWidth(250)  # 너비 조정
+        marker_control_group_layout = QVBoxLayout()
+        
+        # 드롭다운 메뉴 생성
+        self.marker_id_dropdown = QComboBox()
+        self.marker_id_dropdown.addItems(['2', '4', '7', '15'])
+        self.marker_id_dropdown.setFixedHeight(50)
+        marker_control_group_layout.addWidget(self.marker_id_dropdown)
+        
+        # GO 버튼 생성
+        self.go_button = QPushButton('GO')
+        self.go_button.setFixedHeight(50)
+        self.go_button.clicked.connect(self.on_go_button_clicked)
+        marker_control_group_layout.addWidget(self.go_button)
+        
+        marker_control_group.setLayout(marker_control_group_layout)
+        marker_control_layout.addWidget(marker_control_group)
+        bottom_layout.addLayout(marker_control_layout)
+
+        # Control and Status Group
         control_status_layout = QVBoxLayout()
         control_status_layout.addWidget(self.create_robot_button_group())
         control_status_layout.addWidget(self.robot_status_group())
@@ -239,6 +269,7 @@ class MainApplication(QStackedWidget):
         conveyor_learning_layout.addWidget(self.create_learning_button_group())
         bottom_layout.addLayout(conveyor_learning_layout)
 
+        # Manipulator Button Group
         bottom_layout.addWidget(self.create_manipulator_button_group())
         main_layout.addLayout(bottom_layout)
 
@@ -391,6 +422,22 @@ class MainApplication(QStackedWidget):
         self.robot_resume_button.setEnabled(enabled)
         self.robot_stop_button.setEnabled(enabled)
         self.robot_reset_button.setEnabled(enabled)
+    
+    # GO 버튼 클릭 시 호출되는 메소드 추가
+    def on_go_button_clicked(self):
+        selected_id = int(self.marker_id_dropdown.currentText())
+        self.on_marker_id_selected(selected_id)
+
+    def on_marker_id_selected(self, selected_id):
+        """GUI에서 마커 ID가 선택되었을 때 호출되는 함수."""
+        self.send_target_marker_id(selected_id)
+
+    def send_target_marker_id(self, marker_id):
+        """사용자가 선택한 마커 ID를 퍼블리시합니다."""
+        msg = Int32()
+        msg.data = marker_id
+        self.target_marker_pub.publish(msg)
+        self.node.get_logger().info(f"타겟 마커 ID {marker_id}를 퍼블리시하였습니다.")
 
     def robot_start(self):
         # self.robot_status = "Running"
@@ -401,7 +448,7 @@ class MainApplication(QStackedWidget):
         self.robot_resume_button.setEnabled(False)
         self.robot_reset_button.setEnabled(False)
         self.node.get_logger().warning("Control Play")
-
+        
     def robot_pause(self):
         # self.robot_status = "Paused"
         self.timer.stop()
