@@ -21,8 +21,16 @@ E-mail: jsh10198@naver.com,   Password: password
  <img src="capture/result_04_44_28.jpg" alt="Aruco Detecting" width="800">
 </p>
 
-### Turtlebot3 Manipulating video
-[turtlebot3 manipulating video](capture/manipulating.MOV)
+### Turtlebot3 Manipulating Video
+[Turtlebot3 Manipulating Demo Video](capture/manipulating.MOV)
+
+### Pick and Place On Conveyorbelt Demo Video
+[Pick and Place On Conveyorbelt Demo Video](capture/PickandPlaceOnConveyorbelt.mp4)
+
+### Virtual Factory 전체 조망도
+<p align="center">
+ <img src="capture/VirtualFactory.jpeg" alt="Virtual Factory.jpeg" width="800">
+</p>
 
 ## How to execute
 
