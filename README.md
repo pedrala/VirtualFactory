@@ -17,6 +17,7 @@ E-mail: jsh10198@naver.com,   Password: password
 </p>
 
 ### 기준마커(ID:2)를 통해 목표마커(ID:15)의 좌표를 계산하는 모습
+벽에 수직으로 붙은 아루코 마커는 z, x 값을 사용하여 목표좌표의 상대거리(tvecs)및 방향(rvecs)을 계산합니다.
 <p align="center">
  <img src="capture/result_04_44_28.jpg" alt="Aruco Detecting" width="800">
 </p>
