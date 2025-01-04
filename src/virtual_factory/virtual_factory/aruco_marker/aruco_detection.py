@@ -58,6 +58,17 @@ class ArucoDetection(Node):
             self.get_logger().error("USB 카메라를 열 수 없습니다.")
             rclpy.shutdown()
             return
+
+        # 타겟 마커 ID 초기화
+        self.target_marker_id = None  # 초기에는 None으로 설정
+
+        # 타겟 마커 ID를 받아오는 구독자 설정
+        self.target_marker_sub = self.create_subscription(
+            Int32,
+            'target_marker_id',
+            self.target_marker_id_callback,
+            qos_profile=qos_profile
+        )
         
         # 상대 위치를 위한 퍼블리셔 설정 (커스텀 메시지)
         self.relative_position_pub = self.create_publisher(
@@ -86,6 +97,13 @@ class ArucoDetection(Node):
         self.timer = self.create_timer(timer_period, self.timer_callback)
         
         self.get_logger().info("ArucoDetection Node Initialized")
+
+    
+    def target_marker_id_callback(self, msg):
+        """GUI 서버로부터 타겟 마커 ID를 받아 업데이트합니다."""
+        self.target_marker_id = msg.data
+        self.get_logger().info(f"타겟 마커 ID가 {self.target_marker_id}(으)로 업데이트 되었습니다.")
+
         
     def timer_callback(self):
         """
@@ -157,7 +175,6 @@ class ArucoDetection(Node):
             # 마커의 자세 추정
             rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, marker_length, camera_matrix, dist_coeffs)
 
-            # 기준 마커 (ID 2)와 타겟 마커 (ID 15) 찾기
             base_rvec, base_tvec = None, None
             target_rvec, target_tvec = None, None
 
@@ -165,7 +182,8 @@ class ArucoDetection(Node):
                 if marker_id == base_marker_id:  # 기준 마커
                     base_rvec, base_tvec = rvecs[i], tvecs[i]
                     self.get_logger().info(f"기준 마커(ID {marker_id}) 발견.")
-                elif marker_id == 15:  # 타겟 마커 (예시로 ID 15 사용)
+                    
+                elif marker_id == self.target_marker_id:  # GUI 서버에서 지정한 타겟 마커
                     target_rvec, target_tvec = rvecs[i], tvecs[i]
                     self.get_logger().info(f"타겟 마커(ID {marker_id}) 발견.")
 
@@ -178,7 +196,7 @@ class ArucoDetection(Node):
 
                     # 메시지 생성
                     msg = RelativePosition()
-                    msg.marker_id = 15
+                    msg.marker_id = self.target_marker_id
                     msg.x = relative_tvec[0]
                     msg.y = 0.0  # y값은 사용하지 않음
                     msg.z = relative_tvec[1]
@@ -235,9 +253,11 @@ class ArucoDetection(Node):
                     # 상대 위치 하나 처리 후 루프 종료
                     break
                 
-                else:
-                    self.get_logger().warn("기준 마커(ID 2) 또는 타겟 마커(ID 15)를 찾을 수 없음.")
+               else:
+                self.get_logger().warn(f"기준 마커(ID {base_marker_id}) 또는 타겟 마커(ID {self.target_marker_id})를 찾을 수 없음.")
 
+        else:
+            self.get_logger().info("아루코 마커를 찾을 수 없습니다.")
 
     def main(args=None):
         """
