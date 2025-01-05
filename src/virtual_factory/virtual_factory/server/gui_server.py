@@ -139,12 +139,17 @@ class MainApplication(QStackedWidget):
         self.coord_rx = ""
         self.coord_ry = ""
         self.coord_rz = ""
-        # Conveyor 버튼 스타트/스탑 클릭시 퍼블리쉬 
-        self.publisher_conveyor = self.node.create_publisher(String, "conveyor_test",  qos_profile=qos_profile)
+
+        # Conveyor 제어를 위한 퍼블리셔 생성
+        self.publisher_conveyor = self.node.create_publisher(String, "conveyor_control_topic",  qos_profile=qos_profile)        
+        # 터틀봇 제어를 위한 퍼블리셔 생성
+        self.amr_control_pub = self.node.create_publisher(String, 'amr_control_topic', qos_profile=qos_profile)
+        # 매니퓰레이터 제어를 위한 퍼블리셔 생성
+        self.manipulator_control_pub = self.node.create_publisher(String, 'manipulator_control_topic', qos_profile=qos_profile)    
         # Learniing 버튼 스타트/스탑 클릭시 퍼블리쉬  
-        self.publisher_learning = self.node.create_publisher(String, "learning_test",  qos_profile=qos_profile)
+        self.publisher_learning = self.node.create_publisher(String, "learning_control_topic",  qos_profile=qos_profile)
         # 타겟카운트 잡조건(빨강박스, 파랑박스) 퍼블리쉬  
-        self.publisher_confirm = self.node.create_publisher(String, 'target_counts',  qos_profile=qos_profile)           
+        self.publisher_confirm = self.node.create_publisher(String, 'target_counts',  qos_profile=qos_profile)      
         
         # status 토픽 Subscribe
         self.subscription_status = self.node.create_subscription(
@@ -316,33 +321,24 @@ class MainApplication(QStackedWidget):
         self.robot_start_button.clicked.connect(self.robot_start)
         layout.addWidget(self.robot_start_button)
 
-        # Pause와 Resume 버튼
-        pause_resume_layout = QHBoxLayout()
-        self.robot_pause_button = QPushButton("Pause")
-        self.robot_pause_button.setFixedHeight(50)
-        self.robot_pause_button.clicked.connect(self.robot_pause)
-        pause_resume_layout.addWidget(self.robot_pause_button)
-
-        self.robot_resume_button = QPushButton("Resume")
-        self.robot_resume_button.setFixedHeight(50)
-        self.robot_resume_button.clicked.connect(self.robot_resume)
-        pause_resume_layout.addWidget(self.robot_resume_button)
-        layout.addLayout(pause_resume_layout)
-
         # Stop 버튼
-        stop_reset_layout = QHBoxLayout()
         self.robot_stop_button = QPushButton("Stop")
         self.robot_stop_button.setFixedHeight(50)
         self.robot_stop_button.setStyleSheet("background-color: red; color: white;")
         self.robot_stop_button.clicked.connect(self.robot_stop)
-        stop_reset_layout.addWidget(self.robot_stop_button)
-
-        # Reset 버튼
+        layout.addWidget(self.robot_stop_button)  
+        
+        # Resume Reset 버튼
+        resume_reset_layout = QHBoxLayout()
+        self.robot_resume_button = QPushButton("Resume")
+        self.robot_resume_button.setFixedHeight(50)
+        self.robot_resume_button.clicked.connect(self.robot_resume)
+        resume_reset_layout.addWidget(self.robot_resume_button)
         self.robot_reset_button = QPushButton("Reset")
         self.robot_reset_button.setFixedHeight(50)
         self.robot_reset_button.clicked.connect(self.robot_reset)
-        stop_reset_layout.addWidget(self.robot_reset_button)
-        layout.addLayout(stop_reset_layout)
+        resume_reset_layout.addWidget(self.robot_reset_button)
+        layout.addLayout(resume_reset_layout)
         
         group_box.setLayout(layout)
         return group_box
@@ -430,7 +426,6 @@ class MainApplication(QStackedWidget):
     def set_all_buttons_enabled(self, enabled):
         """모든 버튼을 활성화/비활성화"""
         self.robot_start_button.setEnabled(enabled)
-        self.robot_pause_button.setEnabled(enabled)
         self.robot_resume_button.setEnabled(enabled)
         self.robot_stop_button.setEnabled(enabled)
         self.robot_reset_button.setEnabled(enabled)
@@ -452,9 +447,9 @@ class MainApplication(QStackedWidget):
         self.node.get_logger().info(f"타겟 마커 ID {marker_id}를 퍼블리시하였습니다.")
 
     def robot_start(self):
-        # self.robot_status = "Running"
+        self.robot_status = "Started"
         self.timer.start(1000)
-        # self.update_status()
+        self.update_status()
         self.set_all_buttons_enabled(True)
         self.robot_start_button.setEnabled(False)
         self.robot_resume_button.setEnabled(False)
@@ -474,44 +469,59 @@ class MainApplication(QStackedWidget):
         self.node.get_logger().info(f"Published marker ID {marker_id}")
         self.robot_status_label.setText(f"Moving to marker {marker_id}")
 
-        
-    def robot_pause(self):
-        # self.robot_status = "Paused"
-        self.timer.stop()
-        # self.update_status()
-        self.robot_pause_button.setEnabled(False)
-        self.robot_resume_button.setEnabled(True)
-        self.node.get_logger().warning("Control Pause")
-
     def robot_resume(self):
-        # self.robot_status = "Running"
+        self.robot_status = "Resummed"
         self.timer.start(1000)
-        # self.update_status()
-        self.robot_pause_button.setEnabled(True)
+        self.update_status()
         self.robot_resume_button.setEnabled(False)
         self.robot_start_button.setEnabled(False)
         self.node.get_logger().warning("Control Resume")
+        
+        amr_stop_msg = String()
+        amr_stop_msg.data = "resume"
+        self.amr_control_pub.publish(amr_stop_msg)
+
+        # 매니퓰레이터에게 Stop 명령 퍼블리시
+        manipulator_stop_msg = String()
+        manipulator_stop_msg.data = "resume"
+        self.manipulator_control_pub.publish(manipulator_stop_msg)
 
     def robot_stop(self):
-        # self.robot_status = "Stopped"
+        self.robot_status = "All Stopped"
         self.timer.stop()
-        # self.update_status()
+        self.update_status()
         self.set_all_buttons_enabled(False)
         self.robot_start_button.setEnabled(False)
-        self.robot_reset_button.setEnabled(True)
-        self.conveyor_start_stop_toggle.setChecked(False)
-        self.conveyor_start_stop_toggle.setText("Conveyor Start")
-        msg_con = String()
-        msg_con.data = "Conveyor Stop"
-        self.publisher_conveyor.publish(msg_con)
-        self.learning_start_stop_toggle.setText("Learning Start")
-        msg_lea = String()
-        msg_lea.data = "Learning Stop"
-        self.publisher_conveyor.publish(msg_lea)
+        self.robot_reset_button.setEnabled(True)       
+        
         self.learning_start_stop_toggle.setChecked(False)
         self.conveyor_start_stop_toggle.setEnabled(False)
         self.learning_start_stop_toggle.setEnabled(False)
-        self.node.get_logger().warning("Control Stop")
+        self.conveyor_start_stop_toggle.setChecked(False)
+        self.learning_start_stop_toggle.setText("Learning Start")
+        self.conveyor_start_stop_toggle.setText("Conveyor Start")
+        
+        # Learning에게 Stop 명령 퍼블리시
+        msg_lea = String()
+        msg_lea.data = "Learning Stop"
+        self.publisher_conveyor.publish(msg_lea)       
+        
+        # conveyor에게 Stop 명령 퍼블리시
+        msg_con = String()
+        msg_con.data = "Conveyor Stop"
+        self.publisher_conveyor.publish(msg_con)
+        
+        # 터틀봇에게 Stop 명령 퍼블리시
+        amr_stop_msg = String()
+        amr_stop_msg.data = "stop"
+        self.amr_control_pub.publish(amr_stop_msg)
+
+        # 매니퓰레이터에게 Stop 명령 퍼블리시
+        manipulator_stop_msg = String()
+        manipulator_stop_msg.data = "stop"
+        self.manipulator_control_pub.publish(manipulator_stop_msg)
+        
+        self.node.get_logger().warning("Published stop commands to Conveyor, AMR and Manipulator")
 
     def robot_reset(self):
         # self.robot_status = "Reset"
@@ -749,7 +759,7 @@ class ConveyorController(Node):
         super().__init__('conveyor_controller')
         self.subscription = self.create_subscription(
             String,
-            'conveyor_test',
+            'conveyor_control_topic',
             self.listener_callback,
             10
         )

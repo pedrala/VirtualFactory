@@ -53,9 +53,12 @@ class RobotManipulationServer(Node):
             depth=10
         )
         
+         # 동작 중지 플래그 초기화
+        self.stop_requested = False
+        
         self.command_sub = self.create_subscription(
             String, 
-            "/learning_test", 
+            "/learning_control_topic", 
             self.command_callback, 
             qos_profile=qos_profile 
         )
@@ -103,6 +106,14 @@ class RobotManipulationServer(Node):
         # YOLO 모델 로드 (YOLOv8 모델 경로를 본인의 환경에 맞게 변경하세요)
         self.yolo_model = YOLO("/home/viator/ws/aruco/virtual_factory/src/virtual_factory/virtual_factory/manipulator/box.pt")
         self.get_logger().info("로봇 매니퓰레이션 서버가 준비되었습니다.")
+        
+        # Stop 명령 수신 서브스크라이버 생성
+        self.stop_subscriber = self.create_subscription(
+            String,
+            'manipulator_control_topic',
+            self.manipulator_control_callback,
+            qos_profile=qos_profile
+        )
 
         # 초기 위치로 이동
         self.move_to_initial_position()
@@ -176,6 +187,13 @@ class RobotManipulationServer(Node):
             self.get_logger().error(f"타겟 카운트 파싱 실패: {e}")
 
     def detect_and_grasp_with_count(self):
+        
+         # 동작 중인지 여부 확인
+        if self.stop_requested:
+            # 동작 중지 명령을 받았으므로 해당 작업을 중지하고 리턴
+            self.get_logger().info("Manipulation stopped due to stop command.")
+            return        
+    
         """
         YOLO를 사용하여 객체를 감지하고 업데이트된 타겟 카운트에 따라 집는 함수.
         """
@@ -450,6 +468,15 @@ class RobotManipulationServer(Node):
         # 이미지 퍼블리시
         self.hand_image_pub.publish(image_msg)
         self.get_logger().info("/gripper_image 토픽으로 이미지를 퍼블리시했습니다.") 
+        
+    def manipulator_control_callback(self, msg):
+        command = msg.data.strip().lower()
+        if command == "stop":
+            self.stop_requested = True
+            self.get_logger().info("Received stop command. Stopping manipulation.")
+        elif command == "resume":
+            self.stop_requested = False
+            self.get_logger().info("Received resume command. Resuming manipulation.")
 
 def main(args=None):
     rclpy.init(args=args)

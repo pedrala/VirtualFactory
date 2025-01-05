@@ -26,6 +26,9 @@ class AMRNode(Node):
             reliability=ReliabilityPolicy.RELIABLE,  
             depth=10
         )
+        
+        # 이동 중지 플래그 초기화
+        self.stop_requested = False
 
         # 로봇의 현재 위치
         self.current_position = Point()
@@ -81,6 +84,13 @@ class AMRNode(Node):
             self.aruco_marker_callback
         )
         
+        # Stop 명령을 수신하는 서브스크라이버 생성
+        self.stop_subscriber = self.create_subscription(
+            String,
+            'amr_control_topic',
+            self.amr_control_callback,
+            qos_profile=qos_profile
+        )        
 
         # 목표 좌표 계산 및 전송
         self.calculate_goal_from_marker()
@@ -140,6 +150,17 @@ class AMRNode(Node):
         #self.move_to_goal(goal_x, goal_y)
   
     def navigate_by_cmd_vel(self, goal_x, goal_y):
+        
+         # 이동 중인지 여부 확인
+        if self.stop_requested:
+            # 이동 중지 명령을 받았으므로 속도를 0으로 설정하고 리턴
+            stop_cmd = Twist()
+            stop_cmd.linear.x = 0.0
+            stop_cmd.angular.z = 0.0
+            self.cmd_vel_pub.publish(stop_cmd)
+            self.get_logger().info("Movement stopped due to stop command.")
+            return
+        
         """cmd_vel을 사용하여 목표로 이동"""
         move_cmd = Twist()
 
@@ -282,6 +303,15 @@ class AMRNode(Node):
                             f"y={self.current_orientation.y:.3f}, "
                             f"z={self.current_orientation.z:.3f}, "
                             f"w={self.current_orientation.w:.3f}")
+        
+    def amr_control_callback(self, msg):
+        command = msg.data.strip().lower()
+        if command == "stop":
+            self.stop_requested = True
+            self.get_logger().info("Received stop command. Stopping movement.")
+        elif command == "resume":
+            self.stop_requested = False
+            self.get_logger().info("Received resume command. Resuming movement.")
 
 def main():
     rclpy.init()
