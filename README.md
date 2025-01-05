@@ -5,14 +5,14 @@ Use the ArUco marker to calculate the relative coordinates and move Turtlebot3 t
 
 ### GUI: Login, MainApplication Window  
 <p align="center">
-  <img src="capture/login_vf.png" alt="Login" width="500"> 
+  <img src="capture/login_vf.png" alt="Login" width="800"> 
 </p>
 
 #### Login Account
 ID: rokey,   Password: 1234
 
 <p align="center">
-  <img src="capture/loggedGUI.png" alt="Login" width="500"> 
+  <img src="capture/loggedGUI.png" alt="Login" width="800"> 
 </p>
 
 #### How to operate
