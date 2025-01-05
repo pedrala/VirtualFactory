@@ -54,7 +54,7 @@ class LoginWindow(QWidget):
 
         # ID Field
         self.id_layout = QVBoxLayout()
-        self.id_label = QLabel("E-mail")
+        self.id_label = QLabel("ID")
         self.id_label.setStyleSheet("font-size: 30px;")
         self.id_input = QLineEdit()
         self.id_input.setPlaceholderText("Enter your E-mail")
