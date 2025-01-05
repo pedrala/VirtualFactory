@@ -12,7 +12,7 @@ Use the ArUco marker to calculate the relative coordinates and move Turtlebot3 t
 ID: rokey,   Password: 1234
 
 <p align="center">
-  <img src="capture/loggedGUI.png" alt="Login" width="800"> 
+  <img src="capture/logged_vf.png" alt="Login" width="800"> 
 </p>
 
 #### How to operate
