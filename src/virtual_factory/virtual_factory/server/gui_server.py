@@ -42,7 +42,7 @@ class LoginWindow(QWidget):
         layout.setSpacing(50)  # Add spacing between widgets
 
         # Titleprocess_frame
-        self.title = QLabel("Robot Control System\n\n\nLogin")
+        self.title = QLabel("Virtual Factory Control System\n\n\nLogin")
         self.title.setFixedHeight(300)
         self.title.setAlignment(Qt.AlignCenter)
         self.title.setStyleSheet("font-size: 36px; font-weight: bold; margin-bottom: 30px;")
@@ -120,7 +120,7 @@ class MainApplication(QStackedWidget):
             depth=10
         )
 
-        self.setWindowTitle("Robot Control System")
+        self.setWindowTitle("Virtual Factory System")
         self.setGeometry(100, 100, 1600, 1000)
         self.node = Node("gui_node")  # ROS2 노드 생성
         self.bridge = CvBridge()  # CvBridge 초gui_server2기화       
@@ -231,36 +231,43 @@ class MainApplication(QStackedWidget):
         top_layout.addLayout(world_eye_layout)
         top_layout.addLayout(hand_eye_layout)
         main_layout.addLayout(top_layout)
+        
+        self.robot_status_group_widget = self.robot_status_group()
 
         # Bottom Section
         bottom_layout = QHBoxLayout()
         
         # 마커 번호 드롭박스와 GO 버튼을 추가할 레이아웃 생성
         marker_control_layout = QVBoxLayout()
-        marker_control_group = QGroupBox("Marker Control")
-        marker_control_group.setFixedWidth(250)  # 너비 조정
+        marker_control_group = QGroupBox("ArUco Marker")
+        marker_control_group.setFixedWidth(500)  # 너비 조정
         marker_control_group_layout = QVBoxLayout()
+        
+        marker_input_layout = QHBoxLayout()
         
         # 드롭다운 메뉴 생성
         self.marker_id_dropdown = QComboBox()
         self.marker_id_dropdown.addItems(['2', '4', '7', '15'])
         self.marker_id_dropdown.setFixedHeight(50)
-        marker_control_group_layout.addWidget(self.marker_id_dropdown)
+        marker_input_layout.addWidget(self.marker_id_dropdown)
         
         # GO 버튼 생성
         self.go_button = QPushButton('GO')
         self.go_button.setFixedHeight(50)
         self.go_button.clicked.connect(self.on_go_button_clicked)
-        marker_control_group_layout.addWidget(self.go_button)
+        marker_input_layout.addWidget(self.go_button)
+        
+        # 그룹 레이아웃에 수평 레이아웃 추가
+        marker_control_group_layout = QVBoxLayout()
+        marker_control_group_layout.addLayout(marker_input_layout)
         
         marker_control_group.setLayout(marker_control_group_layout)
         marker_control_layout.addWidget(marker_control_group)
-        bottom_layout.addLayout(marker_control_layout)
 
         # Control and Status Group
         control_status_layout = QVBoxLayout()
         control_status_layout.addWidget(self.create_robot_button_group())
-        control_status_layout.addWidget(self.robot_status_group())
+        control_status_layout.addLayout(marker_control_layout) 
         bottom_layout.addLayout(control_status_layout)
 
         # Conveyor and Learning Vertical Group
@@ -399,8 +406,7 @@ class MainApplication(QStackedWidget):
         # 작업 선택 드롭다운
         input_layout = QHBoxLayout()
         self.work_combobox = QComboBox()
-        self.work_combobox.addItems(["Nothing",
-                                     "Red*2,   Blue*1,   Goal1",
+        self.work_combobox.addItems(["Red*2,   Blue*1,   Goal1",
                                      "Red*1,   Blue*2,   Goal2",
                                      "Red*1,   Goal3"])
         self.work_combobox.setFixedHeight(50)
@@ -411,6 +417,7 @@ class MainApplication(QStackedWidget):
         self.confirm_button.setFixedHeight(50)
         self.confirm_button.clicked.connect(self.confirm_play)
         layout.addWidget(self.confirm_button)
+        layout.addWidget(self.robot_status_group_widget)
 
         group_box.setLayout(layout)
         return group_box
