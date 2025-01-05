@@ -21,11 +21,14 @@ When an employee presses the play button, the Turtlebot issues Aruco markers in 
 An employee can also manually move Turtlebot to the desired marker by selecting the Aruko marker directly from Dropbox.
 
 When an employee selects a job from dropbox, a 'target_counts' ros topic is published, which is received by the manipulator and the job is executed.
+
 Below is job list which manipulator must conduct when employee selects.
 
 ##### Job1 : Red*2,   Blue*1,
 ##### Job2 : Red*1,   Blue*2,
 ##### Job3 : Red*1,
+
+In an emergency situation, if an employee presses the red Stop button, the conveyor belt, AMR, and Manipulator will all stop.
 
 ### Running the ArUco node in the terminal
 <p align="center">
