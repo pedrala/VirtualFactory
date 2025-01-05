@@ -9,7 +9,7 @@ Use the ArUco marker to calculate the relative coordinates and move Turtlebot3 t
 </p>
 
 #### Login 입력정보
-E-mail: jsh10198@naver.com,   Password: password
+ID: rokey,   Password: 1234
 
 ### Login 후 World Eye 로 ArUco 마커를 감지하는 모습
 <p align="center">
