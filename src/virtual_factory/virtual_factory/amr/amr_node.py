@@ -1,4 +1,3 @@
-import sys
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Point, Twist
@@ -6,14 +5,15 @@ from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
 from nav2_msgs.action import NavigateToPose
 import math
-from virtual_factory_if.msg import RelativePosition  # Import the custom message
-from virtual_factory_if.srv import GoalLocation  # Import the custom message
+from virtual_factory_if.srv import GoalLocation
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from tf2_ros import TransformBroadcaster
 from tf2_geometry_msgs import PoseStamped
 from geometry_msgs.msg import Quaternion
+from std_msgs.msg import String
 #from tf2_geometry_msgs.tf2_geometry_msgs import toMsg
 from scipy.spatial.transform import Rotation as R
+
 
 #import tf_transformations as tft  # 기존 라이브러리를추가!
 
@@ -57,6 +57,13 @@ class AMRNode(Node):
             PoseStamped,
             '/initialpose',
             qos_profile=qos_profile 
+        )
+        
+        # 상태 메시지를 퍼블리시하는 퍼블리셔 추가
+        self.status_pub = self.create_publisher(
+            String,
+            'status_topic',
+            qos_profile=qos_profile
         )
 
         # odometry 위치 정보를 구독
@@ -104,6 +111,9 @@ class AMRNode(Node):
         self.aruco_marker_position.x = request.z
         self.aruco_marker_position.y = request.x
         self.quaternion = request.quaternion
+        
+        # 현재 목표로 하는 마커 ID 저장
+        self.current_marker_id = request.marker_id
             
         # 아루코 마커의 상대 좌표를 받았으므로 목표 좌표 계산
         self.calculate_goal_from_marker()
@@ -126,10 +136,10 @@ class AMRNode(Node):
         goal_y = self.current_position.y + delta_y
 
         # 목표 좌표 전송
-        self.navigate_by_cmd_vel(goal_x, goal_y, self.quaternion)
+        self.navigate_by_cmd_vel(goal_x, goal_y)
         #self.move_to_goal(goal_x, goal_y)
   
-    def navigate_by_cmd_vel(self, goal_x, goal_y, quaternion):
+    def navigate_by_cmd_vel(self, goal_x, goal_y):
         """cmd_vel을 사용하여 목표로 이동"""
         move_cmd = Twist()
 
@@ -141,43 +151,52 @@ class AMRNode(Node):
         target_angle = math.atan2(delta_y, delta_x)
         
         # 현재 로봇의 방향 (현재 orientation 값을 yaw로 변환)
-        current_quaternion = self.current_orientation  # 로봇의 현재 orientation (Quaternion)
-        if self.current_quaternion is not None:
-            quaternion_list = [self.current_quaternion.x, self.current_quaternion.y, self.current_quaternion.z, self.current_quaternion.w]
+        if self.current_orientation is not None:
+            quaternion_list = [
+                self.current_orientation.x,
+                self.current_orientation.y,
+                self.current_orientation.z,
+                self.current_orientation.w
+            ]
+            # Quaternion을 Euler 각도로 변환하여 yaw를 추출
+            current_rotation = R.from_quat(quaternion_list)
+            current_yaw = current_rotation.as_euler('xyz')[2]  # Euler 각도에서 yaw 값 추출
         else:
             # 오류 처리 또는 기본값 설정
-            quaternion_list = [0, 0, 0, 1]  # 기본 쿼터니언 (회전 없음)
+            current_yaw = 0.0  # 기본 yaw 값
 
-        # Quaternion을 Euler 각도로 변환하여 yaw를 추출
-        current_rotation = R.from_quat(quaternion_list)
-        current_yaw = current_rotation.as_euler('xyz')[2]  # Euler 각도에서 yaw 값 추출
+        # 목표 yaw (목표 지점의 방향)
+        target_yaw = target_angle
 
-        # self.quaternion이 tf2 Quaternion 객체라고 가정
-        quaternion_list = [self.quaternion.x, self.quaternion.y, self.quaternion.z, self.quaternion.w]
-
-        # 목표 yaw (쿼터니언에서 변환)
-        target_rotation = R.from_quat(quaternion_list)
-        target_yaw = target_rotation.as_euler('xyz')[2]  # 목표 yaw 값 추출
-
-        # 각도 오차 계산 (목표 방향 정렬 + 최종 목표 회전)
-        angle_error = target_angle - current_yaw
-        yaw_error = target_yaw - current_yaw
+        # 각도 오차 계산
+        angle_error = target_yaw - current_yaw
+        # 각도를 [-pi, pi] 범위로 정규화
+        angle_error = math.atan2(math.sin(angle_error), math.cos(angle_error))
 
         # 각속도 제어 (P제어)
         if abs(angle_error) > 0.1:  # 목표로 방향 정렬
             move_cmd.angular.z = min(max(angle_error * self.kp, -0.5), 0.5)
+            move_cmd.linear.x = 0.0  # 회전 중에는 전진 속도를 0으로 설정
         else:
-            move_cmd.angular.z = min(max(yaw_error * self.kp, -0.5), 0.5)
-
-        # 선속도 제어
-        distance = math.sqrt(delta_x**2 + delta_y**2)
-        if distance > 0.1:  # 목표 도달 허용 오차
-            move_cmd.linear.x = min(distance * self.kp, 0.5)  # 최대 속도 제한
-        else:
-            # 목표 도달 시 속도를 0으로 설정
-            move_cmd.linear.x = 0.0
+            # 방향이 맞으면 전진 시작
             move_cmd.angular.z = 0.0
-            self.get_logger().info(f"목표 도달: x={goal_x}, y={goal_y}")
+            distance = math.sqrt(delta_x**2 + delta_y**2)
+            if distance > 0.1:  # 목표 도달 허용 오차
+                move_cmd.linear.x = min(distance * self.kp, 0.2)  # 최대 속도 제한
+            else:
+                # 목표 도달 시 속도를 0으로 설정
+                move_cmd.linear.x = 0.0
+                move_cmd.angular.z = 0.0
+                self.get_logger().info(f"목표 도달: x={goal_x}, y={goal_y}")
+
+                # 목표에 도달했으므로 상태 메시지 퍼블리시
+                if self.current_marker_id is not None:
+                    status_msg = String()
+                    status_msg.data = f'arrived at marker {self.current_marker_id}'
+                    self.status_pub.publish(status_msg)
+                    self.get_logger().info(f"Published status: {status_msg.data}")
+
+                return  # 더 이상 이동 명령을 발행하지 않음
 
         # cmd_vel 퍼블리시
         self.cmd_vel_pub.publish(move_cmd)

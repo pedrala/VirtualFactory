@@ -33,6 +33,11 @@ from std_msgs.msg import Int32, Float32, String
 class LoginWindow(QWidget):
     def __init__(self, stacked_widget):
         super().__init__()
+        
+        # 마커 시퀀스 관리 변수 추가
+        self.marker_sequence = [4, 7, 15]
+        self.current_marker_index = 0
+        
         self.stacked_widget = stacked_widget
         self.error_label = QLabel()  # 에러 메시지 레이블을 초기화
 
@@ -456,6 +461,20 @@ class MainApplication(QStackedWidget):
         self.robot_reset_button.setEnabled(False)
         self.node.get_logger().warning("Control Play")
         
+         # 마커 시퀀스 시작
+        self.current_marker_index = 0
+        first_marker_id = self.marker_sequence[self.current_marker_index]
+        self.publish_marker_id(first_marker_id)    
+        
+    
+    def publish_marker_id(self, marker_id):
+        msg = Int32()
+        msg.data = marker_id
+        self.target_marker_pub.publish(msg)
+        self.node.get_logger().info(f"Published marker ID {marker_id}")
+        self.robot_status_label.setText(f"Moving to marker {marker_id}")
+
+        
     def robot_pause(self):
         # self.robot_status = "Paused"
         self.timer.stop()
@@ -631,8 +650,26 @@ class MainApplication(QStackedWidget):
     def status_callback(self, msg):
         """수신된 메시지를 확인하여 'error' 상태일 경우 이메일을 보냄."""
         self.status = msg.data
-        self.get_logger().info(f"Received status: {self.status}")
+        self.node.get_logger().info(f"Received status: {self.status}")
         self.update_status(self.status)
+        
+        # 상태 메시지가 마커 도착을 나타내는 경우 처리
+        if 'arrived at marker' in self.status:
+            try:
+                arrived_marker_id = int(self.status.split('arrived at marker')[1].strip())
+                expected_marker_id = self.marker_sequence[self.current_marker_index]
+                if arrived_marker_id == expected_marker_id:
+                    self.robot_status_label.setText(f"Arrived at marker {arrived_marker_id}")
+                    self.current_marker_index += 1
+                    #마지막 마커에 도착하기 전까지 다음 마커아이디 퍼블리쉬
+                    if self.current_marker_index < len(self.marker_sequence):
+                        next_marker_id = self.marker_sequence[self.current_marker_index]
+                        self.publish_marker_id(next_marker_id)
+                    else:
+                        self.node.get_logger().info("Marker sequence completed.")
+                        self.robot_status_label.setText("All markers reached.")
+            except Exception as e:
+                self.node.get_logger().error(f"Error parsing status message: {e}")
         
         if self.status == 'error':
             self.send_email("Error detected", "An error has been detected in the system!")
