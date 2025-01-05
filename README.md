@@ -5,8 +5,8 @@ Use the ArUco marker to calculate the relative coordinates and move Turtlebot3 t
 
 ### GUI 로 띄운 Login창, Login한 모습  
 <p align="center">
-  <img src="capture/login.png" alt="Login" width="500"> 
-  <img src="capture/logged.png" alt="Login" width="500"> 
+  <img src="capture/login_vf.png" alt="Login" width="500"> 
+  <img src="capture/loggedGUI.png" alt="Login" width="500"> 
 </p>
 
 #### Login 입력정보
