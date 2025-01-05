@@ -104,7 +104,7 @@ class LoginWindow(QWidget):
         user_id = self.id_input.text()
         password = self.password_input.text()
 
-        if user_id == "jsh10198@naver.com" and password == "password":
+        if user_id == "rokey" and password == "1234":
             self.stacked_widget.setCurrentIndex(1)
             self.error_label.setText("")  # 에러 메시지를 비움
         else:
