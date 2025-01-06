@@ -16,7 +16,7 @@ ID: rokey,   Password: 1234
 </p>
 
 #### How to operate
-When an employee presses the play button, the Turtlebot issues Aruco markers in the order of Aruco marker 4->7->15 and moves to the corresponding marker locations. After arriving at each location, it stops and saves and displays the status as "arrived at marker 2".
+When an employee presses the **Play** button, the Turtlebot issues Aruco markers in the order of Aruco marker 4->7->15 and moves to the corresponding marker locations. After arriving at each location, it stops and saves and displays the status as "arrived at marker 2".
 
 An employee can also manually move Turtlebot to the desired marker by selecting the Aruko marker directly from Dropbox.
 
@@ -28,7 +28,10 @@ Below is job list which manipulator must conduct when employee selects.
 ##### Job2 : Red * 1,   Blue * 2,
 ##### Job3 : Red * 1,
 
-In an emergency situation, if an employee presses the red Stop button, the conveyor belt, AMR, and Manipulator will all stop.
+In an emergency situation, if an employee presses the red **Stop** button, the conveyor belt, AMR, and Manipulator will all stop.
+
+When the employee presses the **Resume** button, it will start again from the point where it stopped, and when the **Reset** button is pressed, the turtlebot will move to the initial position, aruco marker 2, and change the status to the initial state.
+
 
 ### Running the ArUco node in the terminal
 <p align="center">
