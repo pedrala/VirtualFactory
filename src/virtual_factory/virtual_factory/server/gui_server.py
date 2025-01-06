@@ -546,7 +546,7 @@ class MainApplication(QStackedWidget):
         self.send_target_marker_id(2)
         
         # Update the status label
-        self.robot_status_label.setText("Reset to initial position (Marker 2)")
+        self.robot_status_label.setText("Reset to initial position")
 
 
     def conveyor_start_stop(self):
