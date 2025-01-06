@@ -32,11 +32,8 @@ from std_msgs.msg import Int32, Float32, String
 
 class LoginWindow(QWidget):
     def __init__(self, stacked_widget):
-        super().__init__()
-        
-        # 마커 시퀀스 관리 변수 추가
-        self.marker_sequence = [4, 7, 15]
-        self.current_marker_index = 0
+        super().__init__()        
+   
         
         self.stacked_widget = stacked_widget
         self.error_label = QLabel()  # 에러 메시지 레이블을 초기화
@@ -118,6 +115,10 @@ class LoginWindow(QWidget):
 class MainApplication(QStackedWidget):
     def __init__(self):
         super().__init__()
+        
+        # 마커 시퀀스 관리 변수 추가
+        self.marker_sequence = [2, 4, 7, 15]
+        self.current_marker_index = 0
         
         # QoS 프로파일 생성
         qos_profile = QoSProfile(
@@ -456,8 +457,7 @@ class MainApplication(QStackedWidget):
         self.robot_reset_button.setEnabled(False)
         self.node.get_logger().warning("Control Play")
         
-         # 마커 시퀀스 시작
-        self.current_marker_index = 0
+        # Marker sequence starts from the current index
         first_marker_id = self.marker_sequence[self.current_marker_index]
         self.publish_marker_id(first_marker_id)    
         
@@ -522,19 +522,32 @@ class MainApplication(QStackedWidget):
         self.manipulator_control_pub.publish(manipulator_stop_msg)
         
         self.node.get_logger().warning("Published stop commands to Conveyor, AMR and Manipulator")
-
+        
     def robot_reset(self):
-        # self.robot_status = "Reset"
+        """Resets the robot to the initial position (marker 2)."""
+        # Stop the timer and reset elapsed time
         self.timer.stop()
         self.elapsed_time = QTime(0, 0, 0)
         self.update_task_time()
-        # self.update_status()
+        
+        # Disable all control buttons except Confirm
         self.set_all_buttons_enabled(False)
         self.robot_start_button.setEnabled(False)
         self.confirm_button.setEnabled(True)
         self.conveyor_start_stop_toggle.setEnabled(True)
         self.learning_start_stop_toggle.setEnabled(True)
+        
         self.node.get_logger().warning("Control Reset")
+        
+        # Reset the marker sequence index to the start
+        self.current_marker_index = 0
+        
+        # Send the robot to the initial marker (marker 2)
+        self.send_target_marker_id(2)
+        
+        # Update the status label
+        self.robot_status_label.setText("Reset to initial position (Marker 2)")
+
 
     def conveyor_start_stop(self):
         if self.conveyor_start_stop_toggle.isChecked():
@@ -816,17 +829,18 @@ def main():
 
     # PyQt5 애플리케이션 초기화
     app = QApplication(sys.argv)
+    
+    # Main Application GUI 생성
+    gui_node = MainApplication()
 
     # Conveyor Controller 노드 생성
     #conveyor_controller_node = ConveyorController()
 
     # MultiThreadedExecutor 생성 및 노드 추가
     executor = MultiThreadedExecutor()
+    executor.add_node(gui_node.node)
     #executor.add_node(conveyor_controller_node)
     
-    # PyQt5 GUI 생성
-    gui_node = MainApplication()
-
     # ROS2 Executor 실행 함수 정의
     def ros_spin():
         try:
@@ -852,6 +866,7 @@ def main():
     finally:
         # 종료 처리
         #conveyor_controller_node.destroy_node()
+        gui_node.node.destroy_node()
         rclpy.shutdown()
 
 
