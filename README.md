@@ -72,10 +72,7 @@ angle_rad = np.arctan2(tvec_relative_xz[1], tvec_relative_xz[0])  # 라디안 �
 [Turtlebot3 Manipulating Demo Video](capture/manipulating.MOV)
 
 ### Pick and Place On Conveyorbelt Demo Video
-<video src="capture/PickandPlaceOnConveyorbelt.mp4" autoplay loop muted playsinline width="600">
-  Your browser does not support the video tag.
-</video>
-<!--[Pick and Place On Conveyorbelt Demo Video](capture/PickandPlaceOnConveyorbelt.mp4)-->
+[Pick and Place On Conveyorbelt Demo Video](capture/PickandPlaceOnConveyorbelt.mp4)
 
 ## How to execute
 
